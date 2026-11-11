@@ -1,0 +1,10 @@
+[package]
+name = "vox-macos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vox-core = { workspace = true }
+
+tracing = { workspace = true }

@@ -1,0 +1,20 @@
+# Rust / Cargo 构建产物
+/target/
+
+# 打包产物（`bash tools/package-macos.sh` 生成）
+/dist/
+
+# Tauri 自动生成的 schema（`cargo build` 时重新生成）
+/src-tauri/gen/
+
+# graft 的本地图缓存（可 `graft build` 重建；.ignore 里又把它加回搜索范围）
+/graft/
+
+# 本地研究目录（不属于本项目，不入库）
+/research/
+
+# macOS
+.DS_Store
+
+# 临时音频（正常不会出现在仓库里）
+*.wav

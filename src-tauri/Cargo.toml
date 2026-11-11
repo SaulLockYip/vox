@@ -1,0 +1,33 @@
+[package]
+name = "vox-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Vox —— 无登录的语音输入工具"
+
+[lib]
+name = "vox_desktop"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "vox-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+vox-app = { workspace = true }
+vox-core = { workspace = true }
+vox-macos = { workspace = true }
+vox-pipeline = { workspace = true }
+vox-providers = { workspace = true }
+vox-storage = { workspace = true }
+
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { version = "1", features = ["v4"] }

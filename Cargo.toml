@@ -1,0 +1,64 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/providers",
+    "crates/audio",
+    "crates/pipeline",
+    "crates/storage",
+    "crates/macos",
+    "crates/app",
+    "crates/cli",
+    "src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+bytes = "1"
+chacha20poly1305 = "0.10"
+core-graphics = "0.24"
+cpal = "0.15"
+futures-util = "0.3"
+getrandom = "0.2"
+hound = "3"
+keyring = "3"
+objc2 = "0.5"
+objc2-app-kit = "0.2"
+objc2-foundation = "0.2"
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "multipart",
+    "stream",
+    "rustls-tls",
+] }
+rubato = "0.15"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-build = { version = "2", features = [] }
+
+vox-core = { path = "crates/core" }
+vox-providers = { path = "crates/providers" }
+vox-audio = { path = "crates/audio" }
+vox-pipeline = { path = "crates/pipeline" }
+vox-storage = { path = "crates/storage" }
+vox-macos = { path = "crates/macos" }
+vox-app = { path = "crates/app" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true

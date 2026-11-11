@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>状态</title>
+  <style>
+    :root {
+      --fbar-bg1: rgba(32,36,46,.97);
+      --fbar-bg2: rgba(22,25,33,.97);
+      --fbar-border: rgba(255,255,255,.09);
+      --fbar-fg: #eef1f7;
+      --fbar-dim: #8b93a6;
+      --fbar-accent: #7aa2ff;
+      --fbar-btn-fg: #dfe4ee;
+      --fbar-btn-border: rgba(255,255,255,.14);
+      --fbar-btn-bg: rgba(255,255,255,.06);
+      --fbar-shadow: 0 6px 16px rgba(0,0,0,.5);
+      --fbar-chip-bg: rgba(122,162,255,.14);
+      --fbar-chip-fg: #a9c1ff;
+    }
+    :root[data-theme="light"] {
+      --fbar-bg1: rgba(255,255,255,.98);
+      --fbar-bg2: rgba(244,246,250,.98);
+      --fbar-border: rgba(0,0,0,.09);
+      --fbar-fg: #1a1e27;
+      --fbar-dim: #5d6675;
+      --fbar-accent: #3b6fe0;
+      --fbar-btn-fg: #2a3040;
+      --fbar-btn-border: rgba(0,0,0,.12);
+      --fbar-btn-bg: rgba(0,0,0,.04);
+      --fbar-shadow: 0 8px 24px rgba(0,0,0,.18);
+      --fbar-chip-bg: rgba(59,111,224,.1);
+      --fbar-chip-fg: #2f5dc0;
+    }
+    html, body {
+      margin: 0; height: 100%; background: transparent;
+      font: 13px/1.4 -apple-system, "PingFang SC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      overflow: hidden;
+    }
+    /* 窗口本身是方角 + 透明，所以阴影必须画在圆角面板上、
+       并留足边距（约 16px），否则阴影会被窗口边界切成一个方框。 */
+    .bar {
+      margin: 16px; border-radius: 20px;
+      background: linear-gradient(180deg, var(--fbar-bg1), var(--fbar-bg2));
+      border: 1px solid var(--fbar-border);
+      box-shadow: var(--fbar-shadow), inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter: blur(20px) saturate(1.4);
+      display: flex; align-items: center; gap: 14px; padding: 0 20px;
+      height: calc(100% - 32px);
+    }
+    /* 录音/处理/已复制：一条紧凑的横条 */
+    #rec-bar { flex-direction: row; }
+    .dot {
+      width: 11px; height: 11px; border-radius: 50%; background: #ff5f56;
+      box-shadow: 0 0 0 0 rgba(255, 95, 86, 0.6);
+      animation: ring 1.4s infinite;
+      flex: 0 0 auto;
+    }
+    .dot.ok { background: #4ec9a5; animation: none; box-shadow: 0 0 8px rgba(78,201,165,.55); }
+    .dot.busy { background: #f5b74e; animation: none; box-shadow: 0 0 8px rgba(245,183,78,.5); }
+    .dot.err { background: #ff6b6b; animation: none; box-shadow: 0 0 8px rgba(255,107,107,.55); }
+    @keyframes ring {
+      0%   { box-shadow: 0 0 0 0 rgba(255,95,86,.55); }
+      70%  { box-shadow: 0 0 0 9px rgba(255,95,86,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,95,86,0); }
+    }
+    .text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+    .mode { color: var(--fbar-fg); font-weight: 600; font-size: 14px; letter-spacing: .2px; }
+    .hint {
+      color: var(--fbar-dim); font-size: 11.5px; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .time {
+      color: var(--fbar-accent); font-variant-numeric: tabular-nums;
+      font-size: 16px; font-weight: 600; min-width: 46px; text-align: right;
+      padding-left: 8px;
+    }
+
+    /* ---------- Ask Anything 的回答面板 ---------- */
+    #reply-bar {
+      flex-direction: column; align-items: stretch; justify-content: flex-start;
+      padding: 0; gap: 0; overflow: hidden;
+      border-radius: 18px;
+    }
+    .reply-head {
+      display: flex; align-items: center; gap: 9px;
+      padding: 14px 16px 12px 18px;
+      border-bottom: 1px solid var(--fbar-border);
+      flex: 0 0 auto;
+    }
+    .reply-title { color: var(--fbar-fg); font-weight: 700; font-size: 13.5px; letter-spacing: .2px; }
+    .reply-chip {
+      font-size: 11px; color: var(--fbar-chip-fg); background: var(--fbar-chip-bg);
+      border-radius: 999px; padding: 2px 9px; font-weight: 600;
+    }
+    .reply-close {
+      margin-left: auto; width: 24px; height: 24px; border-radius: 8px;
+      border: 1px solid transparent; background: transparent;
+      color: var(--fbar-dim); font-size: 15px; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit;
+    }
+    .reply-close:hover { background: var(--fbar-btn-bg); color: var(--fbar-fg); }
+    .reply-q {
+      padding: 10px 18px 0; color: var(--fbar-dim); font-size: 12px;
+      display: flex; gap: 6px; align-items: baseline; flex: 0 0 auto;
+    }
+    .reply-q b { color: var(--fbar-fg); font-weight: 600; flex: 0 0 auto; }
+    .reply-q span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reply-txt {
+      color: var(--fbar-btn-fg); font-size: 13.5px; line-height: 1.72;
+      padding: 8px 18px 12px; overflow-y: auto; user-select: text;
+      flex: 1; min-height: 0; word-break: break-word;
+    }
+    .reply-txt p { margin: 0 0 8px; }
+    .reply-txt p:last-child { margin-bottom: 0; }
+    .reply-txt h3 { margin: 4px 0 6px; font-size: 13.5px; color: var(--fbar-fg); }
+    .reply-txt ul, .reply-txt ol { margin: 2px 0 8px; padding-left: 20px; }
+    .reply-txt li { margin: 2px 0; }
+    .reply-txt strong { color: var(--fbar-fg); font-weight: 700; }
+    .reply-txt code {
+      background: var(--fbar-btn-bg); border-radius: 5px; padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    }
+    .reply-txt a { color: var(--fbar-accent); }
+    .reply-foot {
+      display: flex; gap: 8px; align-items: center;
+      padding: 11px 16px 13px 18px;
+      border-top: 1px solid var(--fbar-border);
+      flex: 0 0 auto;
+    }
+    .reply-sub { color: var(--fbar-dim); font-size: 11px; margin-right: auto; }
+    .copy {
+      border: 1px solid var(--fbar-btn-border);
+      background: var(--fbar-btn-bg); color: var(--fbar-btn-fg);
+      border-radius: 9px; padding: 6px 12px; font-size: 12px;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    .copy:hover { background: rgba(255,255,255,.12); }
+    .copy.done { color: #4ec9a5; border-color: rgba(78,201,165,.4); }
+    .copy.primary {
+      background: rgba(91,140,255,.22); border-color: rgba(91,140,255,.5);
+      color: #cdd9ff; font-weight: 600;
+    }
+    :root[data-theme="light"] .copy.primary {
+      background: rgba(59,111,224,.12); border-color: rgba(59,111,224,.35); color: #2f5dc0;
+    }
+    .copy.primary:hover { background: rgba(91,140,255,.32); }
+  </style>
+</head>
+<body>
+  <!-- 录音中 / 处理中 / 已复制 -->
+  <div class="bar" id="rec-bar">
+    <div class="dot" id="dot"></div>
+    <div class="text">
+      <div class="mode" id="mode">听写</div>
+      <div class="hint" id="hint">按一次键完成</div>
+    </div>
+    <div class="time" id="time">0.0s</div>
+  </div>
+
+  <!-- Ask Anything 的回答面板 -->
+  <div class="bar" id="reply-bar" style="display:none">
+    <div class="reply-head">
+      <div class="dot ok"></div>
+      <div class="reply-title">Ask Anything</div>
+      <div class="reply-chip" id="reply-chip">显示在面板</div>
+      <button class="reply-close" id="reply-close" title="关闭">✕</button>
+    </div>
+    <div class="reply-q" id="reply-q" style="display:none">
+      <b>问</b><span id="reply-question"></span>
+    </div>
+    <div class="reply-txt"><div id="reply-body"></div></div>
+    <div class="reply-foot">
+      <span class="reply-sub" id="reply-sub"></span>
+      <button class="copy primary" id="insert-btn" style="display:none">插入到光标</button>
+      <button class="copy" id="open-btn" style="display:none">打开</button>
+      <button class="copy" id="copy-btn">复制</button>
+    </div>
+  </div>
+
+  <script>
+    const { listen } = window.__TAURI__.event;
+    const { invoke } = window.__TAURI__.core;
+
+    const LABELS = { dictation: "听写", translate: "翻译", ask_anything: "Ask Anything" };
+    // 各模式对应的快捷键（从设置里读，显示成「按 X 完成」）
+    let HOTKEYS = { dictation: "快捷键", translate: "快捷键", ask_anything: "快捷键" };
+    // toggle = 按一次开始/再按一次完成；push_to_talk = 按住说话/松开完成
+    let HOTKEY_MODE = "toggle";
+
+    let timer = null;
+    let started = Date.now();
+    let currentSession = "";
+    let currentPhase = "";
+    let hideTimer = null;
+    // 上一次渲染的内容指纹，用来判断「有没有变」
+    let lastKey = "";
+
+    (async () => {
+      try {
+        const cfg = await invoke("get_config");
+        const g = cfg.general || {};
+        // 跟随主窗口的外观
+        const theme = g.appearance || "dark";
+        const mq = window.matchMedia("(prefers-color-scheme: light)");
+        document.documentElement.dataset.theme =
+          theme === "system" ? (mq.matches ? "light" : "dark") : theme;
+        if (g.hotkey_dictation) HOTKEYS.dictation = g.hotkey_dictation;
+        if (g.hotkey_translate) HOTKEYS.translate = g.hotkey_translate;
+        if (g.hotkey_ask) HOTKEYS.ask_anything = g.hotkey_ask;
+        if (g.hotkey_mode) HOTKEY_MODE = g.hotkey_mode;
+      } catch (e) {
+        /* 读不到就用默认 */
+      }
+    })();
+
+    function tick() {
+      const s = (Date.now() - started) / 1000;
+      document.getElementById("time").textContent = s.toFixed(1) + "s";
+    }
+
+    function stopTimer() {
+      if (timer) { clearInterval(timer); timer = null; }
+    }
+
+    function showBar() {
+      document.getElementById("rec-bar").style.display = "flex";
+      document.getElementById("reply-bar").style.display = "none";
+    }
+
+    /* ---------- 迷你 Markdown 渲染 ---------- */
+    // 先转义再拼标签，避免模型输出里的 < > 被当成 HTML
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+    function inlineMd(s) {
+      return s
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+                 '<a href="$2" onclick="window.open(\'$2\');return false;">$1</a>');
+    }
+    function renderMarkdown(src) {
+      const lines = escapeHtml(src || "").split("\n");
+      let html = "";
+      let listType = null; // "ul" | "ol"
+      const closeList = () => { if (listType) { html += "</" + listType + ">"; listType = null; } };
+      for (const raw of lines) {
+        const line = raw.replace(/\s+$/, "");
+        if (!line.trim()) { closeList(); continue; }
+        let m;
+        if ((m = line.match(/^#{1,6}\s+(.*)$/))) {
+          closeList();
+          html += "<h3>" + inlineMd(m[1]) + "</h3>";
+          continue;
+        }
+        if ((m = line.match(/^[-*+]\s+(.*)$/))) {
+          if (listType !== "ul") { closeList(); html += "<ul>"; listType = "ul"; }
+          html += "<li>" + inlineMd(m[1]) + "</li>";
+          continue;
+        }
+        if ((m = line.match(/^\d+[.)]\s+(.*)$/))) {
+          if (listType !== "ol") { closeList(); html += "<ol>"; listType = "ol"; }
+          html += "<li>" + inlineMd(m[1]) + "</li>";
+          continue;
+        }
+        closeList();
+        html += "<p>" + inlineMd(line) + "</p>";
+      }
+      closeList();
+      return html || "<p>（空）</p>";
+    }
+
+    const DELIVERY_LABELS = {
+      reply: "显示在面板", insert: "插入到光标", replace: "替换选区",
+    };
+
+    function showReply(text, action, question, delivery) {
+      document.getElementById("rec-bar").style.display = "none";
+      const bar = document.getElementById("reply-bar");
+      bar.style.display = "flex";
+      document.getElementById("reply-body").innerHTML = renderMarkdown(text);
+      const chip = document.getElementById("reply-chip");
+      chip.textContent = DELIVERY_LABELS[delivery] || "显示在面板";
+      // 有问题就显示「问：xxx」，方便对照
+      const q = document.getElementById("reply-q");
+      if (question && question.trim()) {
+        q.style.display = "flex";
+        document.getElementById("reply-question").textContent = question.trim();
+      } else {
+        q.style.display = "none";
+      }
+      const ob = document.getElementById("open-btn");
+      ob.style.display = action ? "inline-block" : "none";
+      ob.dataset.target = action || "";
+      ob.textContent = "打开";
+      const ib = document.getElementById("insert-btn");
+      ib.style.display = delivery === "insert" || delivery === "replace" ? "none" : "inline-block";
+      ib.textContent = "插入到光标";
+      document.getElementById("reply-sub").textContent = "回答";
+      const btn = document.getElementById("copy-btn");
+      btn.textContent = "复制";
+      btn.classList.remove("done");
+      fitReplyHeight();
+    }
+
+    /* 让回答面板**按内容高度**收缩：短答案不撑成大空盒子 */
+    function fitReplyHeight() {
+      const bar = document.getElementById("reply-bar");
+      if (bar.style.display === "none") return;
+      const body = document.getElementById("reply-body");
+      const head = document.querySelector(".reply-head");
+      const foot = document.querySelector(".reply-foot");
+      const q = document.getElementById("reply-q");
+      const qH = q.style.display === "none" ? 0 : (q.offsetHeight || 0);
+      // 面板自身的上下留白（.bar 的 margin 16px × 2）+ 边框
+      const want = (body.offsetHeight || 0) + (head.offsetHeight || 0) +
+                   (foot.offsetHeight || 0) + qH + 34;
+      invoke("set_float_height", { height: Math.ceil(want) }).catch(() => {});
+    }
+
+    function showCopied() {
+      showBar();
+      document.getElementById("dot").className = "dot ok";
+      document.getElementById("mode").textContent = "已复制";
+      document.getElementById("hint").textContent = "结果已复制到剪贴板";
+      document.getElementById("time").textContent = "";
+    }
+
+    // st = { mode, session, phase, text, inserted, action, delivery, question }
+    function apply(st) {
+      if (!st) return;
+      const phase = st.phase || "idle";
+      // 内容完全没变就什么都不做（否则会反复重置自动隐藏的计时器）
+      const key = [phase, st.session || "", st.text || "", st.inserted ? 1 : 0,
+                   st.action || "", st.delivery || "", st.question || "", st.hint || ""].join("|");
+      if (key === lastKey) return;
+      lastKey = key;
+
+      if (phase === "idle") {
+        stopTimer();
+        currentSession = "";
+        currentPhase = "";
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        // 兜底：后端说空闲了就把窗口收起来（后端也会做，这里是双保险）
+        invoke("hide_float").catch(() => {});
+        return;
+      }
+
+      if (phase === "recording") {
+        const key2 = HOTKEYS[st.mode] || "快捷键";
+        const wantHint = st.hint ||
+          (HOTKEY_MODE === "push_to_talk" ? `松开 ${key2} 完成` : `按 ${key2} 完成`);
+        // 同一次录音就不重置计时，但提示语要能更新
+        // （松开键之后会变成「已松开 · 再按一次 RightCtrl 结束」）
+        if (st.session === currentSession && currentPhase === "recording") {
+          const hintEl = document.getElementById("hint");
+          if (hintEl.textContent !== wantHint) hintEl.textContent = wantHint;
+          return;
+        }
+        currentSession = st.session || "";
+        currentPhase = phase;
+        showBar();
+        document.getElementById("dot").className = "dot";
+        document.getElementById("mode").textContent = LABELS[st.mode] || st.mode;
+        document.getElementById("hint").textContent = wantHint;
+        started = Date.now(); // ← 新的一次录音，计时归零
+        tick();
+        stopTimer();
+        timer = setInterval(tick, 100);
+        return;
+      }
+
+      if (phase === "processing") {
+        currentPhase = phase;
+        stopTimer();
+        showBar();
+        document.getElementById("dot").className = "dot busy";
+        document.getElementById("mode").textContent = LABELS[st.mode] || st.mode;
+        document.getElementById("hint").textContent = "处理中…";
+        document.getElementById("time").textContent = "";
+        return;
+      }
+
+      if (phase === "copied") {
+        currentPhase = phase;
+        stopTimer();
+        showCopied();
+        return;
+      }
+
+      if (phase === "reply") {
+        currentPhase = phase;
+        stopTimer();
+        showReply(st.text || "", st.action || "", st.question || "", st.delivery || "reply");
+        // 回答面板常驻：后端 90 秒后自动收起，也可以点 ✕ / Esc 收起
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        return;
+      }
+
+      if (phase === "error") {
+        currentPhase = phase;
+        stopTimer();
+        showBar();
+        document.getElementById("dot").className = "dot err";
+        document.getElementById("mode").textContent = "出错了";
+        document.getElementById("hint").textContent = st.text || "";
+        document.getElementById("time").textContent = "";
+      }
+    }
+
+    listen("vox://float-mode", (e) => apply(e.payload));
+
+    // 点录音条空白处：正在录 → **结束录音并处理**；否则 = 收起
+    // （给用户一个「不用再按一次热键」的出路，避免浮窗卡在「录音中」）
+    document.getElementById("rec-bar").addEventListener("click", (ev) => {
+      if (ev.target.closest(".copy")) return;
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (currentPhase === "recording") {
+        invoke("stop_recording").catch(() => {});
+      } else {
+        invoke("hide_float").catch(() => {});
+      }
+    });
+
+    // 回答面板：✕ 关闭 / Esc 关闭
+    document.getElementById("reply-close").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      invoke("hide_float").catch(() => {});
+    });
+    window.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      if (currentPhase === "recording") {
+        invoke("stop_recording").catch(() => {});
+      } else {
+        invoke("hide_float").catch(() => {});
+      }
+    });
+
+    document.getElementById("copy-btn").addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const txt = document.getElementById("reply-body").innerText || "";
+      try {
+        await invoke("copy_to_clipboard", { text: txt });
+        const btn = document.getElementById("copy-btn");
+        btn.textContent = "已复制";
+        btn.classList.add("done");
+      } catch (e) {
+        /* 复制失败就保持原样 */
+      }
+    });
+
+    document.getElementById("insert-btn").addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const txt = document.getElementById("reply-body").innerText || "";
+      if (!txt.trim()) return;
+      try {
+        await invoke("insert_text", { text: txt });
+        const btn = document.getElementById("insert-btn");
+        btn.textContent = "已插入";
+        invoke("hide_float").catch(() => {});
+      } catch (e) {
+        const btn = document.getElementById("insert-btn");
+        btn.textContent = "插入失败";
+      }
+    });
+
+    document.getElementById("open-btn").addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const target = ev.currentTarget.dataset.target || "";
+      if (!target) return;
+      try {
+        await invoke("open_action", { target });
+        ev.currentTarget.textContent = "已打开";
+      } catch (e) {
+        ev.currentTarget.textContent = "打开失败";
+      }
+    });
+
+    // 悬浮窗是隐藏状态启动的，事件可能在页面 ready 之前就发出去了；
+    // 这里轮询后端状态兜底，保证模式与计时器一定能对上。
+    (async function poll() {
+      try {
+        apply(await invoke("float_state"));
+      } catch (e) {
+        /* 后端还没起来，忽略 */
+      }
+    })();
+    setInterval(async () => {
+      try {
+        apply(await invoke("float_state"));
+      } catch (e) {
+        /* 忽略 */
+      }
+    }, 250);
+  </script>
+</body>
+</html>

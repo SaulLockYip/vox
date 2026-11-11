@@ -1,0 +1,12 @@
+[package]
+name = "vox-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vox-core = { workspace = true }
+
+cpal = { workspace = true }
+hound = { workspace = true }
+tracing = { workspace = true }

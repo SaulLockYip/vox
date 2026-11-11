@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vox</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="logo">◉</span>
+        <div>
+          <div class="brand-name">Vox</div>
+          <div class="brand-sub">无登录语音输入</div>
+        </div>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="general">通用</button>
+        <button class="tab" data-tab="models">模型</button>
+        <button class="tab" data-tab="prompts">Prompt</button>
+        <button class="tab" data-tab="dict">词典</button>
+        <button class="tab" data-tab="history">历史</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">就绪</span>
+      </div>
+    </aside>
+
+    <main class="content">
+      <!-- 权限/设备引导横幅 -->
+      <div class="banner hidden" id="perm-banner">
+        <div class="banner-main">
+          <div class="banner-title" id="perm-title"></div>
+          <div class="banner-desc" id="perm-desc"></div>
+        </div>
+        <div class="banner-actions">
+          <button class="btn primary" id="perm-open">打开系统设置</button>
+          <button class="btn" id="perm-recheck">重新检测</button>
+        </div>
+      </div>
+
+      <section class="panel recorder">
+        <div class="rec-row">
+          <button class="rec-btn" data-mode="dictation">
+            <span class="rec-title">听写</span>
+            <span class="rec-hint">按住说话</span>
+          </button>
+          <button class="rec-btn" data-mode="translate">
+            <span class="rec-title">翻译</span>
+            <span class="rec-hint">按住说话</span>
+          </button>
+          <button class="rec-btn" data-mode="ask_anything">
+            <span class="rec-title">Ask Anything</span>
+            <span class="rec-hint">按住说话</span>
+          </button>
+        </div>
+        <div class="rec-output">
+          <div class="rec-output-label" id="rec-label">结果</div>
+          <div class="rec-output-text" id="rec-output">（还没有结果）</div>
+          <button class="link" id="clear_result">清除</button>
+        </div>
+      </section>
+
+      <section class="panel page" id="page-general">
+        <h2>通用</h2>
+        <div class="health" id="health-list"></div>
+        <div class="grid">
+          <label class="field"><span>听写热键</span>
+            <input id="hotkey_dictation" type="text" placeholder="RightCtrl" /></label>
+          <label class="field"><span>翻译热键</span>
+            <input id="hotkey_translate" type="text" placeholder="RightCtrl+RightShift" /></label>
+          <label class="field"><span>Ask 热键</span>
+            <input id="hotkey_ask" type="text" placeholder="RightCtrl+Space" /></label>
+          <label class="field"><span>外观</span>
+            <select id="appearance">
+              <option value="dark">深色</option>
+              <option value="light">浅色</option>
+              <option value="system">跟随系统</option>
+            </select></label>
+          <label class="field"><span>热键结束方式</span>
+            <select id="hotkey_mode">
+              <option value="toggle">按一次开始 / 再按一次结束</option>
+              <option value="push_to_talk">按住说话 / 松开就结束</option>
+            </select></label>
+          <label class="field"><span>首选语言</span>
+            <input id="preferred_language" type="text" placeholder="zh-CN" /></label>
+          <label class="field"><span>翻译目标语言</span>
+            <input id="translate_target" type="text" placeholder="en-US" /></label>
+          <label class="field"><span>文本注入方式</span>
+            <select id="insert_method">
+              <option value="clipboard">剪贴板 + ⌘V</option>
+              <option value="ax">辅助功能直接写入</option>
+              <option value="auto">自动</option>
+            </select></label>
+          <label class="field"><span>历史保留天数（-1 永久）</span>
+            <input id="history_retention_days" type="number" /></label>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="auto_punctuation" /><span>自动标点</span></label>
+          <label class="check"><input type="checkbox" id="smart_formatting" /><span>智能格式化</span></label>
+          <label class="check"><input type="checkbox" id="use_dictionary" /><span>启用个人词典</span></label>
+          <label class="check"><input type="checkbox" id="keep_result_in_clipboard" /><span>结果保留在剪贴板</span></label>
+          <label class="check"><input type="checkbox" id="interaction_sounds" /><span>交互声音（开始/停止录音的提示音）</span></label>
+          <label class="check"><input type="checkbox" id="mute_audio_while_dictating" /><span>语音输入时静音（录的时候把其它声音静音）</span></label>
+          <label class="check"><input type="checkbox" id="launch_at_login" /><span>开机自启</span></label>
+        </div>
+        <div class="meta" id="config-path"></div>
+
+        <div class="sub">输入设备</div>
+        <div class="keyrow">
+          <select id="input_device"></select>
+          <button class="btn" id="mic_refresh">重新检测输入设备</button>
+          <span class="key-state" id="mic-state"></span>
+        </div>
+      </section>
+
+      <section class="panel page hidden" id="page-models">
+        <h2>模型</h2>
+        <div class="sub">语音识别（MiniMax ASR）</div>
+        <div class="grid">
+          <label class="field"><span>Base URL</span>
+            <input id="stt_base_url" type="text" placeholder="https://api.minimax.cn" /></label>
+          <label class="field"><span>Path</span>
+            <input id="stt_path" type="text" placeholder="/v1/speech_to_text" /></label>
+          <label class="field"><span>Model</span>
+            <input id="stt_model" type="text" placeholder="asr-1.0" /></label>
+          <label class="field"><span>语言提示（空 = 混合）</span>
+            <input id="stt_language" type="text" placeholder="zh" /></label>
+        </div>
+        <div class="keyrow">
+          <input id="stt_key" type="password" placeholder="ASR API Key（加密存到本地文件）" />
+          <button class="btn" id="save_stt_key">保存 ASR Key</button>
+          <span class="key-state" id="stt_key_state"></span>
+        </div>
+
+        <div class="sub">LLM（Anthropic 兼容）</div>
+        <div class="grid">
+          <label class="field"><span>Base URL</span>
+            <input id="llm_base_url" type="text" placeholder="https://api.minimax.cn/anthropic" /></label>
+          <label class="field"><span>Path</span>
+            <input id="llm_path" type="text" placeholder="/v1/messages" /></label>
+          <label class="field"><span>Model</span>
+            <input id="llm_model" type="text" placeholder="MiniMax-M2.7-highspeed" /></label>
+          <label class="field"><span>Max tokens</span>
+            <input id="llm_max_tokens" type="number" /></label>
+          <label class="field"><span>思考深度 effort</span>
+            <select id="llm_effort">
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
+            </select></label>
+          <label class="field"><span>Thinking</span>
+            <select id="llm_thinking">
+              <option value="adaptive">adaptive</option>
+              <option value="disabled">disabled（M3.1-Flash 会 400）</option>
+              <option value="omit">不发送该字段</option>
+            </select></label>
+        </div>
+        <div class="keyrow">
+          <input id="llm_key" type="password" placeholder="LLM API Key（加密存到本地文件）" />
+          <button class="btn" id="save_llm_key">保存 LLM Key</button>
+          <span class="key-state" id="llm_key_state"></span>
+        </div>
+        <div class="meta" id="secrets-path"></div>
+
+        <div class="sub">Ask Anything 专用参数（开思考 → 更准；留空则跟随上面）</div>
+        <div class="grid">
+          <label class="field"><span>模型</span>
+            <input id="ask_model" type="text" placeholder="MiniMax-M3" /></label>
+          <label class="field"><span>Thinking</span>
+            <select id="ask_thinking">
+              <option value="adaptive">adaptive（开思考）</option>
+              <option value="disabled">disabled</option>
+              <option value="omit">不发送该字段</option>
+            </select></label>
+          <label class="field"><span>思考深度 effort</span>
+            <select id="ask_effort">
+              <option value="low">low（快）</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max（慢）</option>
+            </select></label>
+          <label class="field"><span>服务层级（越快越贵）</span>
+            <select id="llm_service_tier">
+              <option value="priority">priority（插队，1.5x 价格）</option>
+              <option value="standard">standard</option>
+              <option value="">不指定</option>
+            </select></label>
+          <label class="field"><span>Ask 本地工具权限</span>
+            <select id="agent_tools">
+              <option value="safe">safe（只允许只读命令：curl / date / open…）</option>
+              <option value="off">off（不给工具，模型只能凭已有知识回答）</option>
+              <option value="all">all（允许任意命令 ⚠️ 等于把 shell 交给模型）</option>
+            </select></label>
+        </div>
+        <p class="hint">
+          听写/翻译用上面的通用参数（<b>关思考</b> → 最快）；Ask Anything 用这组（<b>开思考</b> → 更准）。
+          注：<code>MiniMax-M3</code> 会忽略 <code>effort</code>（实测开启/关闭耗时一致），
+          换成 <code>MiniMax-M3.1-Flash</code> 才会按 effort 调节，但整体慢约 4 倍。
+        </p>
+      </section>
+
+      <section class="panel page hidden" id="page-prompts">
+        <h2>Prompt</h2>
+        <p class="hint">
+          可用占位符：<code>{{transcript}}</code> <code>{{target_language}}</code>
+          <code>{{selection}}</code> <code>{{app_name}}</code> <code>{{dictionary}}</code>；
+          条件区段 <code>{{#name}}…{{/name}}</code>（值为空时整段丢弃）。
+        </p>
+        <label class="field block"><span>听写（整理口语、加标点）</span>
+          <textarea id="prompt_dictation" rows="7"></textarea></label>
+        <label class="field block"><span>翻译</span>
+          <textarea id="prompt_translate" rows="5"></textarea></label>
+        <label class="field block"><span>Ask Anything</span>
+          <textarea id="prompt_ask_anything" rows="8"></textarea></label>
+      </section>
+
+      <section class="panel page hidden" id="page-dict">
+        <h2>个人词典</h2>
+        <p class="hint">词条会在识别结果里做本地替换；「替换为」留空表示只作为提示词给模型。</p>
+        <div class="keyrow">
+          <input id="dict_term" type="text" placeholder="词条" />
+          <input id="dict_replacement" type="text" placeholder="替换为（可空）" />
+          <button class="btn" id="dict_add">添加</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>词条</th><th>替换为</th><th></th></tr></thead>
+            <tbody id="dict_rows"></tbody>
+          </table>
+        </div>
+        <div class="keyrow">
+          <input id="dict_csv" type="text" placeholder="CSV 文本（单列，每行一个词）" />
+          <button class="btn" id="dict_import">批量导入</button>
+        </div>
+      </section>
+
+      <section class="panel page hidden" id="page-history">
+        <h2>历史</h2>
+        <div class="keyrow">
+          <button class="btn" id="history_refresh">刷新</button>
+          <button class="btn danger" id="history_clear">清空</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>时间</th><th>模式</th><th>文本</th><th></th></tr></thead>
+            <tbody id="history_rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <button class="btn primary" id="save_all">保存全部设置</button>
+        <span class="toast" id="toast"></span>
+      </footer>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

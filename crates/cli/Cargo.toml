@@ -1,0 +1,23 @@
+[package]
+name = "vox-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vox"
+path = "src/main.rs"
+
+[dependencies]
+vox-app = { workspace = true }
+vox-audio = { workspace = true }
+vox-core = { workspace = true }
+vox-macos = { workspace = true }
+vox-pipeline = { workspace = true }
+vox-providers = { workspace = true }
+vox-storage = { workspace = true }
+
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

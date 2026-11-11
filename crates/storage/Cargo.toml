@@ -1,0 +1,13 @@
+[package]
+name = "vox-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vox-core = { workspace = true }
+vox-pipeline = { path = "../pipeline" }
+
+rusqlite = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }

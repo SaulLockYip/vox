@@ -499,6 +499,13 @@ mod tests {
             return; // 还没有提交
         }
 
+        // 报告检查覆盖面（**只有数量**，绝不打印密钥本身）
+        eprintln!(
+            "[密钥审计] 检查 {} 个密钥 × {} 个 git 对象",
+            keys.len(),
+            shas.len()
+        );
+
         let mut hits: Vec<String> = Vec::new();
         for sha in &shas {
             let Ok(obj) = Command::new("git")

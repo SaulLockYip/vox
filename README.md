@@ -51,12 +51,34 @@ Rust 核心 + Tauri v2 外壳 · 模型走你自己的接口 · 数据只留本�
 
 ## 快速开始
 
+**直接用**（Release 页下 `Vox-0.1.0-macOS.zip`）：
+
+```bash
+unzip Vox-0.1.0-macOS.zip
+mv Vox.app /Applications/
+open -a Vox
+```
+
+**自己编译**：
+
 ```bash
 git clone https://github.com/SaulLockYip/vox.git
 cd vox
 bash tools/package-macos.sh          # 编译 → 打包 → ad-hoc 签名 → 安装到 /Applications
 open -a Vox
 ```
+
+> **首次打开被拦？** 包是 ad-hoc 签名的（没有付费的开发者证书），
+> Gatekeeper 可能拦一下 —— 这是签名问题，**两种方式自己解决**：
+>
+> ```bash
+> # 方式一：右键点 Vox.app → 选「打开」→ 再点「打开」
+> # 方式二：命令行去掉隔离标记
+> xattr -dr com.apple.quarantine /Applications/Vox.app
+> ```
+>
+> 之后每次启动都不再需要处理。想彻底没有这个提示，就自己拿一张
+> [Apple Developer ID](https://developer.apple.com/programs/) 证书重新签名。
 
 > **首次使用需要授权**：系统设置 › 隐私与安全性 › 辅助功能 › 勾选 **Vox**。
 > 全局热键监听和「把文字插进光标」都依赖这个权限。
@@ -135,7 +157,6 @@ src-tauri/    Tauri v2 外壳                    ui/         前端（纯静态�
 
 ## 已知限制
 
-- **ad-hoc 签名**：没有 Developer ID 证书，拷到别的 Mac 会被 Gatekeeper 拦（自己本机正常用）
 - 问答的 `replace` 目前等价于 insert（靠粘贴顺带替换选区）
 - 还没做的：免提双击、合盖停止、富文本插入、词典自动学习、个性化、多语言 UI
 

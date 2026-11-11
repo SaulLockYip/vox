@@ -1,119 +1,144 @@
+<div align="center">
+
 # Vox
 
-**无登录的语音输入工具** —— 用 Rust + Tauri v2 写的 macOS 桌面应用。
+**macOS 上的无登录语音输入工具** —— 听写 / 翻译 / 问答
 
-三种模式：**听写 / 翻译 / 问答（Ask Anything）**。模型层走你自己的接口
-（`base_url` / `model` / `prompt` 全部在设置里可改），**没有账号、没有订阅**，
-所有数据只留在本机。
+Rust 核心 + Tauri v2 外壳 · 模型走你自己的接口 · 数据只留本机
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![macOS](https://img.shields.io/badge/macOS-12%2B-lightgrey.svg)
+![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)
+![Release](https://img.shields.io/github/v/release/vox.svg)
+
+</div>
 
 ---
+
+## 是什么
+
+一个常驻菜单栏的 macOS 应用，按一下热键说话，松手（或再按一次）就把整理好的文字插进光标处。
+
+- **没有账号、没有订阅、没有云同步** —— API key 只存在你自己的机器上
+- **模型层可换** —— `base_url` / `model` / `prompt` 全在设置里改
+- **纯 Rust 核心** —— 录音、ASR、LLM、注入全在本地进程里，可脚本化调用
+
+## 界面
+
+<table>
+<tr>
+<td width="50%"><img src="docs/settings.png" alt="设置界面"><br><sub>设置界面：热键、模型、Prompt、词典、历史</sub></td>
+<td width="50%"><img src="docs/ask-panel.png" alt="问答回答面板"><br><sub>问答：回答直接显示在浮窗面板里</sub></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><img src="docs/float-bar.png" alt="录音浮条" width="60%"><br><sub>录音时：主屏底部居中的紧凑浮条</sub></td>
+</tr>
+</table>
+
+## 功能
+
+| | |
+|---|---|
+| 🎙 **听写** | 口语 → 整理成能直接用的文字（去口头禅、自我更正整体替换、自动分点分段） |
+| 🌐 **翻译** | 说中文出外语，目标语言可配 |
+| 💬 **问答** | 能带着**光标上下文**提问，也能真的查实时数据（模型自己调工具） |
+| ⌨️ **三种热键** | `RightCtrl` 听写 / `RightCtrl+RightShift` 翻译 / `RightCtrl+Space` 问答，**结束键统一是 `RightCtrl`** |
+| 📋 **个人词典** | 本地词条替换，也能提示模型用正确的写法 |
+| 🔒 **密钥加密存储** | XChaCha20-Poly1305 加密存本地文件，**不进系统钥匙串** |
+| 🎨 **外观** | 深色 / 浅色 / 跟随系统 |
+| 🔇 **录音时静音** | 录的时候把其它声音压掉，不串进麦克风 |
+| 📦 **CLI 同源** | `vox dictation` / `vox ask` / `vox hotkey`，和 GUI 共用同一套核心 |
 
 ## 快速开始
 
 ```bash
-# 编译 + 打包 + ad-hoc 签名 + 安装到 /Applications/Vox.app
-bash tools/package-macos.sh
-
-# 只编译不安装
-bash tools/package-macos.sh --no-install
-
-# 跑测试
-cargo test --workspace
-
-# 命令行版（不需要 GUI）
-cargo run -p vox-cli -- doctor      # 体检：配置/密钥/麦克风/权限
-cargo run -p vox-cli -- dictation    # 录音（回车停止）→ 整理 → 插入光标
+git clone https://github.com/SaulLockYip/vox.git
+cd vox
+bash tools/package-macos.sh          # 编译 → 打包 → ad-hoc 签名 → 安装到 /Applications
+open -a Vox
 ```
 
-装好后启动 `Vox.app`（菜单栏图标常驻）。**第一次使用需要给「辅助功能」权限**：
-系统设置 › 隐私与安全性 › 辅助功能 › 勾选 Vox，否则全局热键和 ⌘V 注入都用不了。
+> **首次使用需要授权**：系统设置 › 隐私与安全性 › 辅助功能 › 勾选 **Vox**。
+> 全局热键监听和「把文字插进光标」都依赖这个权限。
 
-## 三种模式与热键
+在设置页填好 ASR / LLM 的 key（`vox secret set stt|llm` 也可以），按 `RightCtrl` 试试。
 
-| 模式 | 开始热键 | 结束 | 结果去哪儿 |
-|---|---|---|---|
-| 听写 | `RightCtrl` | 再按一次 `RightCtrl` | 插入光标处 |
-| 翻译 | `RightCtrl+RightShift` | 按 `RightCtrl` | 插入光标处 |
-| 问答 | `RightCtrl+Space` | 按 `RightCtrl` | **由模型自己决定**（见下） |
+## 它是怎么工作的
 
-- **结束热键统一是听写热键**：三种模式只用「开始热键」区分。
-- `RightCtrl` 是其它组合的前缀，所以**先按 `RightCtrl` 再加按 `Space`** 才是问答。
-- 录音期间浮条会显示在**主屏底部居中**；点它可以**直接结束录音**（Esc 同理）。
+```
+按键 → 采集 16kHz 单声道 → ASR 转写 → 按模式渲染 prompt → LLM 整理
+     → 词典替换 → 剪贴板 + ⌘V 注入光标
+```
 
-### 问答的投递方式由模型决定
+- **听写 / 翻译**：结果直接写进光标处
+- **问答**：结果**由模型自己决定**放在哪 —— 显示在面板里，还是写进文档：
 
-模型在回答末尾给一行标记，Vox 照办：
+  | 模型输出 | Vox 的动作 |
+  |---|---|
+  | `[[deliver: reply]]` | 显示在浮窗面板里（默认） |
+  | `[[deliver: insert]]` | 写进光标处 |
+  | `[[deliver: replace]]` | 替换选中的内容 |
+  | `[[open: URL]]` | 打开网址/应用（**直接执行，不弹确认框**） |
 
-| 标记 | 行为 |
-|---|---|
-| `[[deliver: reply]]` | 显示在浮窗面板里（**默认**：解释、建议、查询） |
-| `[[deliver: insert]]` | 直接写进光标处（用户明确要「写进文档」时） |
-| `[[deliver: replace]]` | 替换掉选中的内容 |
-| `[[open: URL]]` | 打开网址/应用（**直接执行，不弹确认框**） |
+  所以你只要正常提问：「帮我打开 B 站」→ 模型回答「好的，正在为你打开…」并**直接把 B 站打开**；
+  「明天北京天气怎么样」→ 模型自己 `curl wttr.in` → 答案里带真实数据。
 
-模型还可以在回答里带上确认（「好的，正在为你打开…」），**Vox 不做事前确认弹窗** ——
-只有涉及**内容确认 / 内容修改**时才需要交互。
-
-### 问答能真的查实时数据
-
-`general.agent_tools` 控制本地工具权限：`off` / `safe`（默认，只读白名单：
-curl / date / open / grep / jq…）/ `all`。模型自己决定要不要调工具，比如
-「明天北京天气怎么样」→ 它会 `curl wttr.in` → 答案里带真实数据。
-
-## 配置与密钥
+## 配置
 
 | 位置 | 内容 |
 |---|---|
 | `~/Library/Application Support/Vox/settings.toml` | 配置（模型、base_url、prompt、热键…） |
-| `~/Library/Application Support/Vox/secrets.json` | 密钥（XChaCha20-Poly1305 加密，0600） |
+| `~/Library/Application Support/Vox/secrets.json` | 密钥（加密，0600） |
 | `~/Library/Application Support/Vox/vox.db` | 历史 + 个人词典（SQLite） |
-| `~/Library/Application Support/Vox/tmp/` | 临时录音（WAV） |
+| `~/Library/Application Support/Vox/tmp/` | 临时录音 |
 
-密钥**只落在本地加密文件里，不进系统钥匙串**。用 `vox secret set stt|llm`（从标准输入读，
-不留在 shell history）或设置页填。
+改内置 prompt 后，老配置里存的旧默认值会**自动迁移**；你自己改过的 prompt **一律不动**。
 
-改内置 prompt 之后，老配置里存的旧默认值会**自动迁移**到新版本；
-你自己改过的 prompt **一律不动**。
+## 命令行
 
-## 目录结构
-
-```
-crates/
-  core/       配置模型、错误类型、模式定义、跨进程锁（instance.rs）
-  providers/  ASR + Anthropic 兼容 LLM（含 tool_use 多轮循环）
-  audio/      cpal 采集、重采样、WAV 编码
-  pipeline/   三种模式的编排、prompt 渲染、词典替换、本地工具执行
-  storage/    SQLite：历史、词典
-  macos/      热键(CGEventTap)、注入、辅助功能、CoreAudio（静音/蓝牙 profile）
-  app/        门面 crate：把上面这些串起来
-  cli/        命令行版（vox）
-src-tauri/    Tauri v2 外壳：设置界面、托盘、浮条
-ui/           前端（纯静态，不经 npm 构建）
-tools/        开发工具（见下）
+```bash
+vox doctor              # 体检：配置 / 密钥 / 麦克风 / 权限
+vox dictation           # 录音（回车停止）→ 整理 → 插入光标
+vox translate           # 翻译
+vox ask                 # 问答
+vox hotkey              # 常驻热键模式
+vox secret set stt      # 从标准输入读密钥（不留在 shell history）
+vox audio               # 蓝牙耳机卡在单声道时，把音质推回 A2DP
 ```
 
-## 开发工具（`tools/`）
+## 开发
+
+```bash
+cargo test --workspace        # 113 个测试
+cargo build --release         # release 构建
+bash tools/package-macos.sh   # 打包 + 签名 + 安装
+```
+
+`tools/` 里还有几个让开发变舒服的小工具：
 
 | 脚本 | 用途 |
 |---|---|
-| `package-macos.sh` | 编译 → 组装 `.app` → ad-hoc 签名 → 安装 |
 | `fake-server.py` | 本地假 ASR/LLM，让全链路可**确定性复现**（真实录音不外传） |
-| `post-key.py` | 注入按键事件，用来自动验证全局热键 |
-| `audio-device.py` | 看/切默认音频设备（排查蓝牙耳机卡在 HFP） |
+| `post-key.py` | 注入按键事件，自动验证全局热键 |
+| `audio-device.py` | 看/切默认音频设备（排查蓝牙耳机音质） |
 
-假服务器用法：
+### 目录
 
-```bash
-python3 tools/fake-server.py 8787 &
-echo "今天天气不错" > /tmp/vox-fake/transcript.txt   # ASR 返回什么
-echo "这是回答。"    > /tmp/vox-fake/answer.txt       # LLM 返回什么
-cat /tmp/vox-fake/prompt.log                         # 每次发给模型的 prompt
 ```
-
-测试时用 `VOX_CONFIG_DIR=/tmp/vox-test-cfg` 跑，**完全不碰真实配置**。
+crates/
+  core/       配置模型、模式定义、跨进程锁      providers/  ASR + LLM 客户端
+  audio/      采集、重采样、WAV                pipeline/   模式编排、prompt、工具
+  storage/    SQLite                           macos/      热键、注入、CoreAudio
+  app/        门面 crate                        cli/        命令行版
+src-tauri/    Tauri v2 外壳                    ui/         前端（纯静态）
+```
 
 ## 已知限制
 
-- **ad-hoc 签名**：本机没有 Developer ID 证书，拷到别的 Mac 会被 Gatekeeper 拦。
-- **问答的 `replace`** 目前等价于 insert（靠粘贴顺带替换选区），没做精确的选区写入。
-- 还没做的：免提双击、合盖停止、富文本插入、词典自动学习、个性化、多语言 UI。
+- **ad-hoc 签名**：没有 Developer ID 证书，拷到别的 Mac 会被 Gatekeeper 拦（自己本机正常用）
+- 问答的 `replace` 目前等价于 insert（靠粘贴顺带替换选区）
+- 还没做的：免提双击、合盖停止、富文本插入、词典自动学习、个性化、多语言 UI
+
+## License
+
+[MIT](LICENSE)

@@ -8,7 +8,7 @@ use std::ffi::c_void;
 use std::process::Command;
 use std::time::Duration;
 
-use vox_core::error::Result;
+use vox_core::error::{Error, Result};
 
 pub use vox_core::config::InsertMethod;
 
@@ -73,13 +73,29 @@ pub fn insert_text(text: &str, _method: InsertMethod, restore_clipboard: bool) -
         return Ok(());
     }
 
+    // 还原时要用**原始字节**：剪贴板里可能有非 UTF-8 内容，
+    // 走 String 往返会把用户的剪贴板变成 `�` 乱码。
     let previous = if restore_clipboard {
-        crate::clipboard::read_clipboard().ok()
+        crate::clipboard::read_clipboard_bytes().ok()
     } else {
         None
     };
 
     crate::clipboard::write_clipboard(text)?;
+
+    // **写完先验一下**：读回来必须和写进去的一模一样，
+    // 否则目标应用粘到的会是乱码 —— 那还不如不粘，直接报错。
+    match crate::clipboard::read_clipboard_bytes() {
+        Ok(back) if back == text.as_bytes() => {}
+        Ok(_) => {
+            return Err(Error::Io(
+                "写入剪贴板后读回的内容不一致（可能是编码问题），已放弃粘贴以免出现乱码".into(),
+            ));
+        }
+        Err(e) => {
+            return Err(Error::Io(format!("校验剪贴板失败: {e}")));
+        }
+    }
 
     // 给目标应用一点时间取到剪贴板内容
     std::thread::sleep(Duration::from_millis(120));
@@ -89,8 +105,8 @@ pub fn insert_text(text: &str, _method: InsertMethod, restore_clipboard: bool) -
     std::thread::sleep(Duration::from_millis(500));
 
     if let Some(prev) = previous {
-        // 恢复原剪贴板（失败不影响已完成的粘贴）
-        let _ = crate::clipboard::write_clipboard(&prev);
+        // 恢复原剪贴板（非 UTF-8 的内容会被跳过，写回只会变成乱码）
+        let _ = crate::clipboard::restore_clipboard_safely(&prev);
     }
 
     Ok(())

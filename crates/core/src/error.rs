@@ -36,4 +36,22 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl Error {
+    /// 这个错误**重试一下**是不是就可能好？
+    ///
+    /// - `Http`（网络/连接被拒/超时）→ 可能
+    /// - `Api` 里的 429（限流）、5xx（服务端临时故障）、408（超时）→ 可能
+    /// - 4xx 的其它状态（401 没授权、400 参数错）→ **重试没用**
+    /// - 解析失败、配置错误等 → 重试没用
+    pub fn is_transient(&self) -> bool {
+        match self {
+            Error::Http(_) => true,
+            Error::Api { status, .. } => {
+                *status == 429 || *status == 408 || (500..600).contains(status)
+            }
+            _ => false,
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;

@@ -2,6 +2,7 @@
 
 pub mod asr;
 pub mod llm;
+pub mod retry;
 pub mod sse;
 
 pub use asr::{AsrClient, AsrResult, Segment};

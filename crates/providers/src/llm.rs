@@ -159,7 +159,15 @@ impl LlmClient {
     }
 
     /// 发一次请求并解析 JSON 响应。
+    ///
+    /// **瞬时失败（429 限流 / 5xx / 网络抖动）会自动重试** ——
+    /// 这类失败过去会直接冒泡，Vox 只好悄悄退回原始转写，用户看到的是
+    /// 「我问什么它就答什么」，完全不知道请求其实失败了。
     async fn send(&self, body: &serde_json::Value) -> Result<serde_json::Value> {
+        crate::retry::with_retry(crate::retry::DEFAULT_ATTEMPTS, || self.send_once(body)).await
+    }
+
+    async fn send_once(&self, body: &serde_json::Value) -> Result<serde_json::Value> {
         let key = self.cfg.api_key()?;
         let resp = self
             .http

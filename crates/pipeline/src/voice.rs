@@ -26,6 +26,11 @@ pub struct PipelineOutcome {
     ///
     /// 听写/翻译恒为 [`Delivery::Insert`]；Ask 由模型自己判断。
     pub delivery: Delivery,
+    /// **LLM 调用失败时的原因**（None = 一切正常）。
+    ///
+    /// 失败时 `final_text` 会退回原始转写（不想让用户白说一遍），
+    /// 但上层**必须**把失败显示出来 —— 否则用户看到的只是「我问什么它答什么」。
+    pub llm_error: Option<String>,
 }
 
 /// 从模型输出里抽取「外部动作」标记，并把标记本身从正文里去掉。
@@ -134,9 +139,11 @@ impl VoicePipeline {
                 refined: false,
                 action: None,
                 delivery: Delivery::Insert,
+                llm_error: None,
             });
         }
 
+        let mut llm_error: Option<String> = None;
         ctx.transcript = raw_text.clone();
         if self.cfg.general.use_dictionary {
             ctx.dictionary_terms = dictionary
@@ -184,11 +191,22 @@ impl VoicePipeline {
             }
         } else {
             self.llm.complete(&req).await
-        }
-        .unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "LLM 处理失败，回退为原始转写");
-            raw_text.clone()
-        });
+        };
+
+        // LLM 失败时**不能悄悄退回原始转写** ——
+        // 那样用户看到的就是「我问什么，它就答什么」（把自己的问题原样吐回来），
+        // 看起来像模型在敷衍，其实是请求失败了。
+        //
+        // 这里：① 记下失败原因；② 仍然把原始转写交给上层（别让用户白说一遍），
+        // 但上层必须把「失败」显示出来。
+        let llm_text = match llm_text {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(error = %e, "LLM 处理失败，回退为原始转写");
+                llm_error = Some(e.to_string());
+                raw_text.clone()
+            }
+        };
 
         // 先抽「外部动作」与「投递方式」标记（要在词典替换之前，否则标记会被改写）
         let (llm_text, action) = extract_action(llm_text.trim());
@@ -213,6 +231,7 @@ impl VoicePipeline {
             final_text,
             action,
             delivery,
+            llm_error,
         })
     }
 }

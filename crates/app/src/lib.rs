@@ -130,7 +130,12 @@ impl VoxApp {
         let entry = HistoryEntry {
             id: uuid::Uuid::new_v4().to_string(),
             mode: mode.as_str().to_string(),
-            status: "completed".into(),
+            // LLM 失败时如实记录，别让历史里显示成「成功」
+            status: if outcome.llm_error.is_some() {
+                "failed".into()
+            } else {
+                "completed".into()
+            },
             raw_text: outcome.raw_text.clone(),
             refined_text: outcome.final_text.clone(),
             duration,

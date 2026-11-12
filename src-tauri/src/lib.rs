@@ -820,8 +820,16 @@ fn spawn_recording(app: AppHandle, mode: Mode, feature: String) -> Result<(), St
                             .unwrap_or("")
                             .to_string();
                         let wants_panel = delivery == "reply";
+                        // LLM 失败 → **明确告诉用户**，别让他以为「我问什么它就答什么」
+                        let llm_error = v
+                            .get("llm_error")
+                            .and_then(|x| x.as_str())
+                            .unwrap_or("")
+                            .to_string();
 
-                        let phase = if wants_panel && !text.trim().is_empty() {
+                        let phase = if !llm_error.is_empty() {
+                            FloatPhase::Error
+                        } else if wants_panel && !text.trim().is_empty() {
                             FloatPhase::Reply
                         } else if text.trim().is_empty() || inserted {
                             FloatPhase::Idle
@@ -832,7 +840,12 @@ fn spawn_recording(app: AppHandle, mode: Mode, feature: String) -> Result<(), St
                         if let Some(state) = handle.try_state::<AppState>() {
                             if let Ok(mut g) = state.float.lock() {
                                 g.phase = phase;
-                                g.text = text;
+                                // 失败时把原因显示出来（结果仍已插入，别让用户白说一遍）
+                                g.text = if llm_error.is_empty() {
+                                    text
+                                } else {
+                                    format!("处理失败：{llm_error}（已插入原始转写）")
+                                };
                                 g.inserted = inserted;
                                 g.action = action.clone();
                                 g.delivery = delivery;
@@ -964,6 +977,7 @@ async fn process(
     // - **Ask Anything** → **由模型自己决定**（`[[deliver: reply|insert|replace]]`）：
     //   reply = 显示在浮窗面板里（默认）；insert/replace = 写进焦点应用。
     let delivery = outcome.delivery;
+    let llm_error = outcome.llm_error.clone();
     let empty = outcome.final_text.trim().is_empty();
     let (inserted, insert_error) = if empty || !delivery.writes_into_app() {
         (false, None)
@@ -985,6 +999,14 @@ async fn process(
         "insert_error": insert_error,
         "action": outcome.action,
         "delivery": delivery.as_str(),
+        // LLM 失败时不为空 —— 上层必须把它显示出来，
+        // 否则用户只看到「我问什么它就答什么」，不知道请求其实失败了
+        "llm_error": llm_error,
+        "status": if outcome.llm_error.is_some() {
+            "failed"
+        } else {
+            "completed"
+        },
     }))
 }
 
@@ -1196,7 +1218,43 @@ fn retry_hotkey(app: AppHandle) -> Result<(), String> {
 
 // ---------------- 入口 ----------------
 
+/// 初始化日志：**stderr + `<app_dir>/vox.log`**。
+///
+/// 之前桌面端**完全没有初始化 tracing**，于是所有 `tracing::warn!/error!`
+/// 都丢进了黑洞 —— 模型请求失败也看不见，用户只看到「我问什么它就答什么」。
+/// 写进文件后，用户可以直接把日志发出来看。
+fn init_logging() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        use tracing_subscriber::layer::SubscriberExt;
+        use tracing_subscriber::util::SubscriberInitExt;
+
+        let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+        let _ = std::fs::create_dir_all(vox_core::config::Config::app_dir());
+        let log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(vox_core::config::Config::app_dir().join("vox.log"))
+            .ok();
+
+        let stderr_layer = tracing_subscriber::fmt::layer().with_writer(std::io::stderr);
+        let registry = tracing_subscriber::registry().with(filter).with(stderr_layer);
+        if let Some(f) = log_file {
+            let _ = registry
+                .with(tracing_subscriber::fmt::layer().with_writer(f))
+                .try_init();
+        } else {
+            let _ = registry.try_init();
+        }
+    });
+}
+
 pub fn run() {
+    init_logging();
+
     // 单实例：已经有 Vox 在跑 → 把那个叫到前台，自己退出。
     // （不这么做的话两个实例会同时开麦、同时插入，内容会重复。）
     let _instance_lock = match vox_core::instance::acquire(vox_core::instance::INSTANCE_LOCK) {

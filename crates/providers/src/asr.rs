@@ -107,6 +107,25 @@ impl AsrClient {
         mime: &str,
         data: Vec<u8>,
     ) -> Result<AsrResult> {
+        // 瞬时失败（429 / 5xx / 网络抖动）重试
+        let filename = filename.to_string();
+        let mime = mime.to_string();
+        let data = data.clone();
+        crate::retry::with_retry(crate::retry::DEFAULT_ATTEMPTS, || {
+            let filename = filename.clone();
+            let mime = mime.clone();
+            let data = data.clone();
+            async move { self.transcribe_bytes_once(&filename, &mime, data).await }
+        })
+        .await
+    }
+
+    async fn transcribe_bytes_once(
+        &self,
+        filename: &str,
+        mime: &str,
+        data: Vec<u8>,
+    ) -> Result<AsrResult> {
         let key = self.cfg.api_key()?;
         let part = reqwest::multipart::Part::bytes(data)
             .file_name(filename.to_string())

@@ -135,28 +135,32 @@ pub fn selected_text_with_fallback() -> Option<String> {
         }
     }
 
-    let prev = crate::clipboard::read_clipboard().ok();
+    // 用**原始字节**做前后对比与还原：剪贴板里可能有非 UTF-8 内容，
+    // 走 String 往返会把它变成 `�` 乱码，还会把乱码当成「选区」喂给模型。
+    let prev = crate::clipboard::read_clipboard_bytes().ok();
     crate::inject::simulate_copy();
     std::thread::sleep(std::time::Duration::from_millis(180));
-    let got = crate::clipboard::read_clipboard().ok();
+    let got = crate::clipboard::read_clipboard_bytes().ok();
 
     // ⌘C 之后剪贴板**没变** → 说明其实没选中任何东西（只是光标），
     // 这时不能把剪贴板里原有的内容当成选区喂给模型。
     let copied = match (&prev, &got) {
         (Some(a), Some(b)) => a != b,
-        (None, Some(b)) => !b.trim().is_empty(),
+        (None, Some(b)) => !b.is_empty(),
         _ => false,
     };
 
-    // 还原剪贴板
+    // 还原剪贴板（非 UTF-8 的内容会被跳过，写回只会变成乱码）
     if let Some(p) = prev {
-        let _ = crate::clipboard::write_clipboard(&p);
+        let _ = crate::clipboard::restore_clipboard_safely(&p);
     }
 
     if !copied {
         return None;
     }
-    got.map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
+    // 只有真正复制到的内容才当「选区」（解码成文本给人/模型看）
+    got.map(|b| String::from_utf8_lossy(&b).trim().to_string())
+        .filter(|t| !t.is_empty())
 }
 
 /// 光标周围的文本上下文。

@@ -4550,6 +4550,7 @@ dependencies = [
  "tauri-build",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "uuid",
  "vox-app",
  "vox-core",

@@ -1249,6 +1249,15 @@ fn init_logging() {
         } else {
             let _ = registry.try_init();
         }
+
+        // 环境信息要**在 subscriber 装好之后**打，否则这条日志会被丢掉
+        tracing::info!(
+            "启动环境: LANG={:?} LC_ALL={:?} LC_CTYPE={:?} __CF_USER_TEXT_ENCODING={:?}",
+            std::env::var("LANG").ok(),
+            std::env::var("LC_ALL").ok(),
+            std::env::var("LC_CTYPE").ok(),
+            std::env::var("__CF_USER_TEXT_ENCODING").ok(),
+        );
     });
 }
 

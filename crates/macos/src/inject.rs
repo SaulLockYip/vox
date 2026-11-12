@@ -83,13 +83,17 @@ pub fn insert_text(text: &str, _method: InsertMethod, restore_clipboard: bool) -
 
     crate::clipboard::write_clipboard(text)?;
 
-    // **写完先验一下**：读回来必须和写进去的一模一样，
-    // 否则目标应用粘到的会是乱码 —— 那还不如不粘，直接报错。
-    match crate::clipboard::read_clipboard_bytes() {
-        Ok(back) if back == text.as_bytes() => {}
+    // **写完先验一下**：读回来必须和写进去的一致，
+    // 否则目标应用粘到的会是旧内容/乱码 —— 那还不如不粘，直接报错。
+    //
+    // 用 `read_clipboard()`（走 NSPasteboard）而不是 `pbpaste`：
+    // **App 粘到的是 NSPasteboard 那一份**，校验必须校同一份，
+    // 否则会出现「我们自己读是对的、用户粘出来是乱码」。
+    match crate::clipboard::read_clipboard() {
+        Ok(back) if back == text => {}
         Ok(_) => {
             return Err(Error::Io(
-                "写入剪贴板后读回的内容不一致（可能是编码问题），已放弃粘贴以免出现乱码".into(),
+                "写入剪贴板后读回的内容不一致（编码问题），已放弃粘贴以免出现乱码".into(),
             ));
         }
         Err(e) => {

@@ -4482,7 +4482,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vox-app"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "serde",
@@ -4500,7 +4500,7 @@ dependencies = [
 
 [[package]]
 name = "vox-audio"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cpal",
  "hound",
@@ -4510,7 +4510,7 @@ dependencies = [
 
 [[package]]
 name = "vox-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "tokio",
@@ -4527,7 +4527,7 @@ dependencies = [
 
 [[package]]
 name = "vox-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chacha20poly1305",
  "getrandom 0.2.17",
@@ -4541,7 +4541,7 @@ dependencies = [
 
 [[package]]
 name = "vox-desktop"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "serde",
@@ -4562,7 +4562,7 @@ dependencies = [
 
 [[package]]
 name = "vox-macos"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "tracing",
  "vox-core",
@@ -4570,7 +4570,7 @@ dependencies = [
 
 [[package]]
 name = "vox-pipeline"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -4581,7 +4581,7 @@ dependencies = [
 
 [[package]]
 name = "vox-providers"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "futures-util",
@@ -4595,7 +4595,7 @@ dependencies = [
 
 [[package]]
 name = "vox-storage"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "rusqlite",
  "serde",

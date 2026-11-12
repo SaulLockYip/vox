@@ -14,7 +14,7 @@ cd "$ROOT"
 
 APP_NAME="Vox"
 BUNDLE_ID="com.vox.desktop"
-VERSION="0.1.0"
+VERSION="0.1.1"
 DIST="$ROOT/dist"
 APP="$DIST/$APP_NAME.app"
 INSTALL_DIR="/Applications"
